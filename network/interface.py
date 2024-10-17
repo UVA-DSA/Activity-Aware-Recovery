@@ -10,6 +10,8 @@ class NetworkState(Enum):
     PACKET_LOSS = 2
     COMMUNICATION_LOSS = 3
 
+LONG_TERM_RECOVERY_TIME = 2
+
 class NetworkInterface:
     def __init__(self, udp_port, output_port):
         self.state = NetworkState.NORMAL
@@ -76,7 +78,7 @@ class NetworkInterface:
                     if time_since_last_packet > 1.5 * self.median_arrival_time:
                         self.state = NetworkState.PACKET_LOSS
                 elif self.state == NetworkState.PACKET_LOSS:
-                    if time_since_last_packet >= 2:
+                    if time_since_last_packet >= LONG_TERM_RECOVERY_TIME:
                         self.state = NetworkState.COMMUNICATION_LOSS
                 elif self.state == NetworkState.COMMUNICATION_LOSS:
                     if self.packet_queue:
