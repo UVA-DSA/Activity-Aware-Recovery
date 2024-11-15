@@ -1,4 +1,5 @@
 from data import *
+from pyquaternion import Quaternion 
 
 POSITION_LEFT = [ "PSML_position_x", "PSML_position_y", "PSML_position_z"]
 ORIENTATION_LEFT = [ "PSML_orientation_x", "PSML_orientation_y", "PSML_orientation_z", "PSML_orientation_w"]
@@ -6,8 +7,7 @@ ORIENTATION_LEFT = [ "PSML_orientation_x", "PSML_orientation_y", "PSML_orientati
 POSITION_RIGHT = [ "PSMR_position_x", "PSMR_position_y", "PSMR_position_z"]
 ORIENTATION_RIGHT = [ "PSMR_orientation_x", "PSMR_orientation_y", "PSMR_orientation_z", "PSMR_orientation_w"]
 
-base_path = "./Datasets/dV/Peg_Transfer"
-data_loader = TaskDataLoader(base_path, "G")
+
 
 def map_gripper_angle(value):
     """Maps gripper angle values from [-0.433, 1.042] to [0, 1] interval, with 1.042 mapping to 0 and -0.433 mapping to 1"""
@@ -24,7 +24,6 @@ def assign_label_column(data: pd.DataFrame, labels: pd.DataFrame):
         end = row['end_frame']
         data.loc[start:end, 'label'] = row['MP_name']
         return data
-dd = assign_label_column(*data_loader.data["S01"]["T02"])
 
 def plot_3d_trajectory(df, segments_df=None, animate=False, output_path='trajectory.gif'):
     """
@@ -32,9 +31,6 @@ def plot_3d_trajectory(df, segments_df=None, animate=False, output_path='traject
     
     Args:
         df (pd.DataFrame): Dataframe containing position and orientation data for both tools
-        x_col (str): Name of x position column for right tool
-        y_col (str): Name of y position column for right tool 
-        z_col (str): Name of z position column for right tool
         segments_df (pd.DataFrame): DataFrame with start_frame, end_frame and label columns
     """
     import matplotlib.pyplot as plt
@@ -106,34 +102,39 @@ def plot_3d_trajectory(df, segments_df=None, animate=False, output_path='traject
 
     # Create figure with subplots
     fig = plt.figure(figsize=(15, 12))
+    gs = fig.add_gridspec(3, 3, width_ratios=[1.5, 0.75, 0.75])
     
     # Create subplots
-    ax_3d = fig.add_subplot(231, projection='3d')
-    ax_x_r = fig.add_subplot(232)
-    ax_x_l = fig.add_subplot(233)
-    ax_y_r = fig.add_subplot(234)
-    ax_y_l = fig.add_subplot(235)
-    ax_z_r = fig.add_subplot(236)
+    ax_3d = fig.add_subplot(gs[:, 0], projection='3d')
+    
+    # Right tool 2D plots
+    ax_x_r = fig.add_subplot(gs[0, 1])
+    ax_y_r = fig.add_subplot(gs[1, 1])
+    ax_z_r = fig.add_subplot(gs[2, 1])
+    
+    # Left tool 2D plots
+    ax_x_l = fig.add_subplot(gs[0, 2])
+    ax_y_l = fig.add_subplot(gs[1, 2])
+    ax_z_l = fig.add_subplot(gs[2, 2])
     
     # Add axis labels
     ax_3d.set_xlabel('X Position')
     ax_3d.set_ylabel('Y Position')
     ax_3d.set_zlabel('Z Position')
     
-    ax_x_r.set_xlabel('Time Frame')
+    # Right tool labels
     ax_x_r.set_ylabel('Right X Position')
-    ax_x_l.set_xlabel('Time Frame')
-    ax_x_l.set_ylabel('Left X Position')
-    
-    ax_y_r.set_xlabel('Time Frame')
     ax_y_r.set_ylabel('Right Y Position')
-    ax_y_l.set_xlabel('Time Frame')
-    ax_y_l.set_ylabel('Left Y Position')
-    
     ax_z_r.set_xlabel('Time Frame')
     ax_z_r.set_ylabel('Right Z Position')
     
-    # Set axis limits for both tools
+    # Left tool labels
+    ax_x_l.set_ylabel('Left X Position')
+    ax_y_l.set_ylabel('Left Y Position')
+    ax_z_l.set_xlabel('Time Frame')
+    ax_z_l.set_ylabel('Left Z Position')
+    
+    # Set axis limits considering both tools
     x_min = min(df[x_col_r].min(), df[x_col_l].min())
     x_max = max(df[x_col_r].max(), df[x_col_l].max())
     y_min = min(df[y_col_r].min(), df[y_col_l].min())
@@ -141,31 +142,41 @@ def plot_3d_trajectory(df, segments_df=None, animate=False, output_path='traject
     z_min = min(df[z_col_r].min(), df[z_col_l].min())
     z_max = max(df[z_col_r].max(), df[z_col_l].max())
     
-    ax_3d.set_xlim([x_min, x_max])
-    ax_3d.set_ylim([y_min, y_max])
-    ax_3d.set_zlim([z_min, z_max])
+    # Add some padding to the limits
+    padding = 0.1
+    x_range = x_max - x_min
+    y_range = y_max - y_min
+    z_range = z_max - z_min
     
+    ax_3d.set_xlim([x_min - padding * x_range, x_max + padding * x_range])
+    ax_3d.set_ylim([y_min - padding * y_range, y_max + padding * y_range])
+    ax_3d.set_zlim([z_min - padding * z_range, z_max + padding * z_range])
+    
+    # Right tool limits
     ax_x_r.set_xlim([0, len(df)])
     ax_x_r.set_ylim([df[x_col_r].min(), df[x_col_r].max()])
-    ax_x_l.set_xlim([0, len(df)])
-    ax_x_l.set_ylim([df[x_col_l].min(), df[x_col_l].max()])
-    
     ax_y_r.set_xlim([0, len(df)])
     ax_y_r.set_ylim([df[y_col_r].min(), df[y_col_r].max()])
-    ax_y_l.set_xlim([0, len(df)])
-    ax_y_l.set_ylim([df[y_col_l].min(), df[y_col_l].max()])
-    
     ax_z_r.set_xlim([0, len(df)])
     ax_z_r.set_ylim([df[z_col_r].min(), df[z_col_r].max()])
+    
+    # Left tool limits
+    ax_x_l.set_xlim([0, len(df)])
+    ax_x_l.set_ylim([df[x_col_l].min(), df[x_col_l].max()])
+    ax_y_l.set_xlim([0, len(df)])
+    ax_y_l.set_ylim([df[y_col_l].min(), df[y_col_l].max()])
+    ax_z_l.set_xlim([0, len(df)])
+    ax_z_l.set_ylim([df[z_col_l].min(), df[z_col_l].max()])
     
     # Initialize empty lines for each segment and tool
     lines_3d_r = []
     lines_3d_l = []
     lines_x_r = []
-    lines_x_l = []
     lines_y_r = []
-    lines_y_l = []
     lines_z_r = []
+    lines_x_l = []
+    lines_y_l = []
+    lines_z_l = []
     
     # Create tool geometry
     def create_tool(ax, pos, quat, jaw_angle, color='r'):
@@ -195,27 +206,32 @@ def plot_3d_trajectory(df, segments_df=None, animate=False, output_path='traject
         ax.plot3D(jaw2[:,0], jaw2[:,1], jaw2[:,2], color+'-', linewidth=2)
     
     if segments_df is not None:
+        unique_labels = segments_df['MP_name'].unique()
         for label in unique_labels:
             # Right tool
-            line_3d_r, = ax_3d.plot3D([], [], [], '-', color=color_map[label], label=f'Right {label}')
+            line_3d_r, = ax_3d.plot3D([], [], [], '-', color=color_map[label], label=label)
             line_x_r, = ax_x_r.plot([], [], '-', color=color_map[label])
             line_y_r, = ax_y_r.plot([], [], '-', color=color_map[label])
             line_z_r, = ax_z_r.plot([], [], '-', color=color_map[label])
             
             # Left tool
-            line_3d_l, = ax_3d.plot3D([], [], [], '--', color=color_map[label], label=f'Left {label}')
-            line_x_l, = ax_x_l.plot([], [], '-', color=color_map[label])
-            line_y_l, = ax_y_l.plot([], [], '-', color=color_map[label])
+            line_3d_l, = ax_3d.plot3D([], [], [], '--', color=color_map[label])
+            line_x_l, = ax_x_l.plot([], [], '--', color=color_map[label])
+            line_y_l, = ax_y_l.plot([], [], '--', color=color_map[label])
+            line_z_l, = ax_z_l.plot([], [], '--', color=color_map[label])
             
             lines_3d_r.append(line_3d_r)
             lines_3d_l.append(line_3d_l)
             lines_x_r.append(line_x_r)
-            lines_x_l.append(line_x_l)
             lines_y_r.append(line_y_r)
-            lines_y_l.append(line_y_l)
             lines_z_r.append(line_z_r)
+            lines_x_l.append(line_x_l)
+            lines_y_l.append(line_y_l)
+            lines_z_l.append(line_z_l)
             
-        ax_3d.legend()
+        # Add single legend to figure
+        fig.legend(lines_3d_r, unique_labels, loc='center right')
+            
     else:
         # Right tool
         line_3d_r, = ax_3d.plot3D([], [], [], 'r-', label='Right Tool')
@@ -224,19 +240,22 @@ def plot_3d_trajectory(df, segments_df=None, animate=False, output_path='traject
         line_z_r, = ax_z_r.plot([], [], 'r-')
         
         # Left tool
-        line_3d_l, = ax_3d.plot3D([], [], [], 'b-', label='Left Tool')
-        line_x_l, = ax_x_l.plot([], [], 'b-')
-        line_y_l, = ax_y_l.plot([], [], 'b-')
+        line_3d_l, = ax_3d.plot3D([], [], [], 'b--', label='Left Tool')
+        line_x_l, = ax_x_l.plot([], [], 'b--')
+        line_y_l, = ax_y_l.plot([], [], 'b--')
+        line_z_l = ax_z_l.plot([], [], 'b--')
         
         lines_3d_r = [line_3d_r]
         lines_3d_l = [line_3d_l]
         lines_x_r = [line_x_r]
-        lines_x_l = [line_x_l]
         lines_y_r = [line_y_r]
-        lines_y_l = [line_y_l]
         lines_z_r = [line_z_r]
+        lines_x_l = [line_x_l]
+        lines_y_l = [line_y_l]
+        lines_z_l = [line_z_l]
         
-        ax_3d.legend()
+        # Add single legend to figure
+        fig.legend(['Right Tool', 'Left Tool'], loc='center right')
     
     # Add slider
     slider_ax = plt.axes([0.2, 0.02, 0.6, 0.03])
@@ -254,98 +273,82 @@ def plot_3d_trajectory(df, segments_df=None, animate=False, output_path='traject
         ax_3d.set_xlabel('X Position')
         ax_3d.set_ylabel('Y Position')
         ax_3d.set_zlabel('Z Position')
-        ax_3d.set_xlim([x_min, x_max])
-        ax_3d.set_ylim([y_min, y_max])
-        ax_3d.set_zlim([z_min, z_max])
+        
+        # Reset 3D axis limits with padding
+        ax_3d.set_xlim([x_min - padding * x_range, x_max + padding * x_range])
+        ax_3d.set_ylim([y_min - padding * y_range, y_max + padding * y_range])
+        ax_3d.set_zlim([z_min - padding * z_range, z_max + padding * z_range])
         
         if segments_df is not None:
-            for i, label in enumerate(sorted(unique_labels)):
-                relevant_segments = segments_df[
-                    (segments_df['MP_name'] == label) & 
-                    (segments_df['end_frame'] <= frame)
-                ]
+            # Get all segments up to current frame
+            relevant_segments = segments_df[segments_df['end_frame'] <= frame]
+            
+            # Plot completed segments in order of appearance
+            for i, segment in relevant_segments.iterrows():
+                label = segment['MP_name']
+                start = segment['start_frame']
+                end = segment['end_frame']
+                label_idx = np.where(unique_labels == label)[0][0]
                 
-                # Initialize points arrays for both tools
-                x_points_r, y_points_r, z_points_r = [], [], []
-                x_points_l, y_points_l, z_points_l = [], [], []
-                frames = []
+                # Plot 3D trajectories
+                ax_3d.plot3D(df[x_col_r][start:end], df[y_col_r][start:end], 
+                           df[z_col_r][start:end], '-', color=color_map[label])
+                ax_3d.plot3D(df[x_col_l][start:end], df[y_col_l][start:end], 
+                           df[z_col_l][start:end], '--', color=color_map[label])
                 
-                if not relevant_segments.empty:
-                    for _, segment in relevant_segments.iterrows():
-                        start = segment['start_frame']
-                        end = segment['end_frame']
-                        
-                        # Right tool
-                        x_points_r.extend(df[x_col_r][start:end])
-                        y_points_r.extend(df[y_col_r][start:end])
-                        z_points_r.extend(df[z_col_r][start:end])
-                        
-                        # Left tool
-                        x_points_l.extend(df[x_col_l][start:end])
-                        y_points_l.extend(df[y_col_l][start:end])
-                        z_points_l.extend(df[z_col_l][start:end])
-                        
-                        frames.extend(range(start, end))
-                        
-                        # Plot completed segments
-                        ax_3d.plot3D(df[x_col_r][start:end], df[y_col_r][start:end], 
-                                   df[z_col_r][start:end], '-', 
-                                   color=color_map[label], label=f'Right {label}' if start==0 else "")
-                        ax_3d.plot3D(df[x_col_l][start:end], df[y_col_l][start:end], 
-                                   df[z_col_l][start:end], '--', 
-                                   color=color_map[label], label=f'Left {label}' if start==0 else "")
+                # Update 2D plots for right tool
+                lines_x_r[label_idx].set_data(range(start, end), df[x_col_r][start:end])
+                lines_y_r[label_idx].set_data(range(start, end), df[y_col_r][start:end])
+                lines_z_r[label_idx].set_data(range(start, end), df[z_col_r][start:end])
                 
-                current_segment = segments_df[
-                    (segments_df['MP_name'] == label) & 
-                    (segments_df['start_frame'] <= frame) & 
-                    (segments_df['end_frame'] > frame)
-                ]
+                # Update 2D plots for left tool
+                lines_x_l[label_idx].set_data(range(start, end), df[x_col_l][start:end])
+                lines_y_l[label_idx].set_data(range(start, end), df[y_col_l][start:end])
+                lines_z_l[label_idx].set_data(range(start, end), df[z_col_l][start:end])
+            
+            # Plot current segment
+            current_segment = segments_df[
+                (segments_df['start_frame'] <= frame) & 
+                (segments_df['end_frame'] > frame)
+            ]
+            
+            if not current_segment.empty:
+                label = current_segment.iloc[0]['MP_name']
+                start = current_segment.iloc[0]['start_frame']
+                label_idx = np.where(unique_labels == label)[0][0]
                 
-                if not current_segment.empty:
-                    start = current_segment.iloc[0]['start_frame']
-                    
-                    # Right tool
-                    x_points_r.extend(df[x_col_r][start:frame])
-                    y_points_r.extend(df[y_col_r][start:frame])
-                    z_points_r.extend(df[z_col_r][start:frame])
-                    
-                    # Left tool
-                    x_points_l.extend(df[x_col_l][start:frame])
-                    y_points_l.extend(df[y_col_l][start:frame])
-                    z_points_l.extend(df[z_col_l][start:frame])
-                    
-                    frames.extend(range(start, frame))
-                    
-                    # Plot current segments
-                    ax_3d.plot3D(df[x_col_r][start:frame], df[y_col_r][start:frame], 
-                               df[z_col_r][start:frame], '-', color=color_map[label])
-                    ax_3d.plot3D(df[x_col_l][start:frame], df[y_col_l][start:frame], 
-                               df[z_col_l][start:frame], '--', color=color_map[label])
+                # Plot 3D trajectories
+                ax_3d.plot3D(df[x_col_r][start:frame], df[y_col_r][start:frame], 
+                           df[z_col_r][start:frame], '-', color=color_map[label])
+                ax_3d.plot3D(df[x_col_l][start:frame], df[y_col_l][start:frame], 
+                           df[z_col_l][start:frame], '--', color=color_map[label])
                 
-                # Update 2D plots
-                lines_x_r[i].set_data(frames, x_points_r)
-                lines_x_l[i].set_data(frames, x_points_l)
-                lines_y_r[i].set_data(frames, y_points_r)
-                lines_y_l[i].set_data(frames, y_points_l)
-                lines_z_r[i].set_data(frames, z_points_r)
+                # Update 2D plots for right tool
+                lines_x_r[label_idx].set_data(range(start, frame), df[x_col_r][start:frame])
+                lines_y_r[label_idx].set_data(range(start, frame), df[y_col_r][start:frame])
+                lines_z_r[label_idx].set_data(range(start, frame), df[z_col_r][start:frame])
                 
-            ax_3d.legend()
+                # Update 2D plots for left tool
+                lines_x_l[label_idx].set_data(range(start, frame), df[x_col_l][start:frame])
+                lines_y_l[label_idx].set_data(range(start, frame), df[y_col_l][start:frame])
+                lines_z_l[label_idx].set_data(range(start, frame), df[z_col_l][start:frame])
                 
         else:
             frames = range(frame)
             
             # Plot trajectories
-            ax_3d.plot3D(df[x_col_r][:frame], df[y_col_r][:frame], df[z_col_r][:frame], 'r-', label='Right Tool')
-            ax_3d.plot3D(df[x_col_l][:frame], df[y_col_l][:frame], df[z_col_l][:frame], 'b-', label='Left Tool')
+            ax_3d.plot3D(df[x_col_r][:frame], df[y_col_r][:frame], df[z_col_r][:frame], 'r-')
+            ax_3d.plot3D(df[x_col_l][:frame], df[y_col_l][:frame], df[z_col_l][:frame], 'b--')
             
-            # Update 2D plots
+            # Update 2D plots for right tool
             lines_x_r[0].set_data(frames, df[x_col_r][:frame])
-            lines_x_l[0].set_data(frames, df[x_col_l][:frame])
             lines_y_r[0].set_data(frames, df[y_col_r][:frame])
-            lines_y_l[0].set_data(frames, df[y_col_l][:frame])
             lines_z_r[0].set_data(frames, df[z_col_r][:frame])
             
-            ax_3d.legend()
+            # Update 2D plots for left tool
+            lines_x_l[0].set_data(frames, df[x_col_l][:frame])
+            lines_y_l[0].set_data(frames, df[y_col_l][:frame])
+            lines_z_l[0].set_data(frames, df[z_col_l][:frame])
         
         # Draw tools at current position
         if frame > 0:
@@ -371,10 +374,116 @@ def plot_3d_trajectory(df, segments_df=None, animate=False, output_path='traject
     plt.tight_layout()
     plt.show()
 
+def extract_commands(data):
+    """Extract delta commands from absolute positions/orientations"""
+    # Initialize commands dataframe
+    commands = pd.DataFrame()
+    
+    # For both PSMs
+    for arm in ['PSML', 'PSMR']:
+        # Position deltas
+        for axis in ['x', 'y', 'z']:
+            col = f"{arm}_position_{axis}"
+            commands[f"{arm}_delta_{axis}"] = data[col].diff()
+        
+        # Orientation deltas
+        for axis in ['x', 'y', 'z', 'w']:
+            col = f"{arm}_orientation_{axis}"
+            commands[f"{arm}_delta_ori_{axis}"] = data[col].diff()
+            
+        # Gripper angle deltas
+        col = f"{arm}_gripper_angle"
+        commands[f"{arm}_delta_gripper"] = data[col].diff()
+            
+    return commands.fillna(0)
+
+def apply_command(curr_pose, command):
+    """Apply a single command to current pose"""
+    new_pose = curr_pose.copy()
+    
+    # For both PSMs
+    for arm in ['PSML', 'PSMR']:
+        # Apply position deltas
+        for axis in ['x', 'y', 'z']:
+            pos_col = f"{arm}_position_{axis}"
+            delta_col = f"{arm}_delta_{axis}"
+            new_pose[pos_col] = curr_pose[pos_col] + command[delta_col]
+        
+        # Apply orientation deltas
+        for axis in ['x', 'y', 'z', 'w']:
+            ori_col = f"{arm}_orientation_{axis}"
+            delta_col = f"{arm}_delta_ori_{axis}"
+            new_pose[ori_col] = curr_pose[ori_col] + command[delta_col]
+            
+        # Apply gripper angle deltas
+        grip_col = f"{arm}_gripper_angle"
+        delta_col = f"{arm}_delta_gripper"
+        new_pose[grip_col] = curr_pose[grip_col] + command[delta_col]
+    
+    return new_pose
+
+def simulate_losses(data, commands, p_loss=0.1, min_loss_len=5, max_loss_len=20):
+    """Simulate communication losses when applying commands"""
+    # Initialize output dataframes
+    new_data = pd.DataFrame(columns=data.columns)
+    new_data.loc[0] = data.iloc[0]  # Start with initial pose
+    
+    loss_intervals = pd.DataFrame(columns=['start_idx', 'end_idx'])
+    
+    curr_frame = 0
+    while curr_frame < len(data)-1:
+        # Check for loss
+        if np.random.random() < p_loss:
+            print(f"Loss at frame {curr_frame}")
+            # Generate random loss length
+            loss_len = np.random.randint(min_loss_len, max_loss_len+1)
+            end_frame = min(curr_frame + loss_len, len(data)-1)
+            
+            # Record loss interval
+            loss_intervals = pd.concat([loss_intervals, 
+                                      pd.DataFrame({'start_idx': [curr_frame],
+                                                  'end_idx': [end_frame]})],
+                                     ignore_index=True)
+            
+            # Repeat last valid pose during loss
+            for i in range(curr_frame+1, end_frame+1):
+                new_data.loc[i] = new_data.loc[curr_frame]
+            
+            curr_frame = end_frame
+        else:
+            # Apply command to last pose
+            new_data.loc[curr_frame+1] = apply_command(new_data.loc[curr_frame], 
+                                                     commands.iloc[curr_frame+1])
+            curr_frame += 1
+            
+    return new_data, loss_intervals
+
 
 if __name__ == "__main__":
-    columns = [POSITION_RIGHT[0], POSITION_RIGHT[2], POSITION_RIGHT[1]]
-    data = data_loader.data["S01"]["T04"][0][:1381]
+    import argparse
+    import json
+
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='Process surgical data with simulated losses')
+    parser.add_argument('--sid', type=str, help='Subject ID (e.g. S01)', default="S01")
+    parser.add_argument('--tid', type=str, help='Trial ID (e.g. T04)', default="T04")
+    args = parser.parse_args()
+
+    # Load config file
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+
+    base_path = "./Datasets/dV/Peg_Transfer"
+    data_loader = TaskDataLoader(base_path, "G")
+    
+    data = data_loader.data[args.sid][args.tid][0].iloc[:1531]
+    labels = data_loader.data[args.sid][args.tid][1].iloc[:1531]
+
+    commands = extract_commands(data)
+    data_with_losses, loss_intervals = simulate_losses(data, commands, 
+                                                     p_loss=config['communication_loss_probability'],
+                                                     min_loss_len=config['min_loss_duration'],
+                                                     max_loss_len=config['max_loss_duration'])
 
     # rename the columns to match the expected format
     data.rename(columns={"PSML_position_x": "PSML_position_x", "PSML_position_y": "PSML_position_z", "PSML_position_z": "PSML_position_y"}, inplace=True)
@@ -382,10 +491,25 @@ if __name__ == "__main__":
 
     data.loc[:, "PSMR_position_y"] *= -1.0
     data.loc[:, "PSML_position_y"] *= -1.0
-
+    data.loc[:, "PSML_position_x"] -= 0.095
+    
     # map the gripper angle to the [0, 1] interval
     data.loc[:, "PSML_gripper_angle"] = data["PSML_gripper_angle"].apply(map_gripper_angle)
     data.loc[:, "PSMR_gripper_angle"] = data["PSMR_gripper_angle"].apply(map_gripper_angle)
+    ###########################################################
+    data_with_losses.rename(columns={"PSML_position_x": "PSML_position_x", "PSML_position_y": "PSML_position_z", "PSML_position_z": "PSML_position_y"}, inplace=True)
+    data_with_losses.rename(columns={"PSMR_position_x": "PSMR_position_x", "PSMR_position_y": "PSMR_position_z", "PSMR_position_z": "PSMR_position_y"}, inplace=True)
 
-    labels = data_loader.data["S01"]["T04"][1][:1381]
-    plot_3d_trajectory(data, labels, animate=True)
+    data_with_losses.loc[:, "PSMR_position_y"] *= -1.0
+    data_with_losses.loc[:, "PSML_position_y"] *= -1.0
+    data_with_losses.loc[:, "PSML_position_x"] -= 0.095
+    # map the gripper angle to the [0, 1] interval
+    data_with_losses.loc[:, "PSML_gripper_angle"] = data["PSML_gripper_angle"].apply(map_gripper_angle)
+    data_with_losses.loc[:, "PSMR_gripper_angle"] = data["PSMR_gripper_angle"].apply(map_gripper_angle)
+
+    
+
+    plot_3d_trajectory(data_with_losses, labels, animate=True)
+
+    # Simulate losses using config parameters
+    
