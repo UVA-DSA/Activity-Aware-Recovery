@@ -27,12 +27,12 @@ INTERMEDIATE = 1
 NOVICE = 0
 SUBJECT_EXPERTISE = {
     "S01": EXPERT,
-    "S02": 2,
-    "S03": 2,
+    "S02": NOVICE,
+    "S03": INTERMEDIATE,
     "S04": NOVICE,
     "S05": EXPERT,
-    "S06": 2,
-    "S07": 2,
+    "S06": INTERMEDIATE,
+    "S07": INTERMEDIATE,
 }
 EXPERTS = [k for k, v in SUBJECT_EXPERTISE.items() if v == EXPERT]
 INTERMEDIATES = [k for k, v in SUBJECT_EXPERTISE.items() if v == INTERMEDIATE]
